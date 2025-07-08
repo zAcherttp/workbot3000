@@ -1,36 +1,29 @@
 # WorkBot 3000 🤖
 
-A Discord bot that monitors Satisfactory game sessions and sends ADA-style motivational quotes when players end their work shifts.
+A TypeScript Discord bot that monitors Satisfactory game sessions and delivers ADA-style motivational quotes to keep your factory workers motivated!
 
-## 🎯 Overview
+## 🎯 Features
 
-WorkBot 3000 is a TypeScript-based Discord bot that:
+- **Discord Presence Monitoring**: Tracks when users are playing Satisfactory through Discord presence
+- **Session Tracking**: Monitors session duration and detects when players end their shifts
+- **ADA-Style Quotes**: Generates motivational quotes using Google's Gemini API in the style of ADA from Satisfactory
+- **Worker Name Mapping**: Customize how player names appear in messages (e.g., "Chief Engineer", "Factory Supervisor")
+- **Smart Message Formatting**: Clean, formatted messages with proper Discord markdown
+- **Robust Error Handling**: Graceful handling of API failures, Discord outages, and edge cases
+- **Comprehensive Logging**: Detailed logging for monitoring and troubleshooting
 
-- Monitors Discord users for Satisfactory game activity
-- Tracks session durations automatically
-- Sends motivational messages with AI-generated quotes in ADA's style from Satisfactory
-- Runs as a cloud-deployable bot with automatic member permission tracking
+## � Quick Start
 
-## 🚀 Features
+### Prerequisites
 
-- **Discord Presence Monitoring**: Tracks Satisfactory game sessions via Discord presence API
-- **ADA-Style Quotes**: Generates quirky, motivational quotes via Google's Gemini API
-- **Session Tracking**: Automatically tracks play sessions and calculates durations
-- **Smart Caching**: Caches quotes to minimize API calls
-- **Robust Error Handling**: Graceful degradation with fallback quotes
-- **Flexible Configuration**: Customizable worker names and settings
-- **Automatic Member Management**: Periodically updates monitored users based on channel permissions
+- Node.js 18+ and pnpm
+- Discord Bot Token with required permissions
+- Google Gemini API key
+- Discord server with a channel for bot messages
 
-## 📋 Requirements
+### Installation
 
-- Node.js 16+
-- pnpm package manager
-- Discord Bot Token
-- Google Gemini API Key
-
-## 🛠️ Installation
-
-### 1. Clone and Install Dependencies
+1. **Clone and setup**:
 
 ```bash
 git clone <repository-url>
@@ -38,15 +31,39 @@ cd workbot3000
 pnpm install
 ```
 
-### 2. Set Up Environment Variables
-
-Copy `.env.example` to `.env` and configure:
+2. **Configure environment**:
 
 ```bash
 cp .env.example .env
+# Edit .env with your tokens and settings
 ```
 
-Edit `.env` with your configuration:
+3. **Build and run**:
+
+```bash
+pnpm build
+pnpm start
+```
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+```env
+# Discord Configuration
+DISCORD_BOT_TOKEN=your_discord_bot_token
+DISCORD_GUILD_ID=your_server_id
+DISCORD_CHANNEL_ID=your_channel_id
+
+# Gemini API Configuration
+GEMINI_API_KEY=your_gemini_api_key
+
+# Worker Name Mapping (optional)
+WORKER_MAPPING={"123456789":"Chief Engineer","987654321":"Factory Supervisor"}
+
+# Logging
+LOG_LEVEL=info
+```
 
 ```env
 # Discord Bot Configuration
@@ -67,72 +84,80 @@ MAX_CACHED_QUOTES=10
 LOG_LEVEL=info
 ```
 
-### 3. Discord Bot Setup
+### Discord Bot Setup
 
-1. Go to [Discord Developer Portal](https://discord.com/developers/applications)
-2. Create a new application
-3. Go to "Bot" section and create a bot
-4. Copy the bot token to your `.env` file
-5. Enable the following bot permissions:
-   - Read Messages
+1. **Create Discord Application**:
+
+   - Go to [Discord Developer Portal](https://discord.com/developers/applications)
+   - Create new application and bot
+   - Copy bot token to `.env`
+
+2. **Required Bot Permissions**:
+
    - Send Messages
-   - Embed Links
-   - Use External Emojis
-6. Enable the following privileged intents (REQUIRED):
+   - Read Message History
+   - View Channel
 
-   - Presence Intent
+3. **Required Intents**:
+
    - Server Members Intent
+   - Message Content Intent
+   - Presence Intent
 
-   **Important**: These are privileged intents that must be enabled in the Discord Developer Portal under Bot → Privileged Gateway Intents.
+4. **Invite Bot**:
+   - Generate invite URL with required permissions
+   - Add bot to your Discord server
 
-7. Invite the bot to your server with proper permissions
+### Gemini API Setup
 
-### 4. Google Gemini API Setup
+1. **Get API Key**:
+   - Visit [Google AI Studio](https://aistudio.google.com/)
+   - Create API key
+   - Add to `.env` file
 
-1. Go to [Google AI Studio](https://aistudio.google.com/)
-2. Create a new API key
-3. Copy the API key to your `.env` file
+## 🎮 How It Works
 
-### 5. Build and Run
+1. **Session Detection**: Bot monitors Discord presence for "Satisfactory" game activity
+2. **Session Tracking**: Tracks when users start and stop playing
+3. **Message Generation**: When a session ends, generates an ADA-style motivational quote
+4. **Message Delivery**: Sends formatted message to configured Discord channel
+
+### Message Format
+
+```
+>>> John Doe "Chief Engineer" has ended their 2h 15m shift
+*Efficiency metrics indicate satisfactory progress, Pioneer. Your factory's optimization parameters are within acceptable ranges.*
+```
+
+## 🔧 Development
+
+### Scripts
 
 ```bash
-# Build the project
-pnpm run build
-
-# Start the bot
-pnpm run start
-
-# Or run in development mode
-pnpm run dev
+pnpm dev        # Development with hot reload
+pnpm build      # Build TypeScript
+pnpm start      # Start production build
+pnpm lint       # Run ESLint
+pnpm test       # Run tests
 ```
 
-## ⚙️ Configuration
+### Project Structure
 
-### Environment Variables
-
-| Variable                | Required | Default            | Description                                 |
-| ----------------------- | -------- | ------------------ | ------------------------------------------- |
-| `DISCORD_TOKEN`         | Yes      | -                  | Discord bot token                           |
-| `CHANNEL_ID`            | Yes      | -                  | Target channel ID for messages              |
-| `GEMINI_API_KEY`        | Yes      | -                  | Google Gemini API key                       |
-| `GEMINI_MODEL`          | No       | `gemini-2.5-flash` | Gemini model to use                         |
-| `WORKER_MAPPING`        | No       | `{}`               | JSON mapping of Discord IDs to worker names |
-| `POLLING_INTERVAL`      | No       | `10`               | Polling interval in seconds                 |
-| `MEMBER_CHECK_INTERVAL` | No       | `300`              | Member check interval in seconds (min: 30)  |
-| `MAX_CACHED_QUOTES`     | No       | `10`               | Maximum quotes to cache                     |
-| `LOG_LEVEL`             | No       | `info`             | Log level (error, warn, info, debug)        |
-
-### Worker Mapping
-
-Map Discord user IDs to custom worker names:
-
-```json
-{
-  "123456789012345678": "Pioneer",
-  "987654321098765432": "Chief Engineer",
-  "555444333222111000": "Factory Manager"
-}
 ```
+src/
+├── index.ts      # Main bot logic
+├── types.ts      # TypeScript interfaces
+├── utils.ts      # Utility functions
+└── gemini.ts     # Gemini API integration
+```
+
+### Key Components
+
+- **Session Management**: Tracks user game sessions using Discord presence
+- **Quote Generation**: Integrates with Gemini API for ADA-style quotes
+- **Message Formatting**: Formats messages with user/worker names and quotes
+- **Error Handling**: Robust error handling with fallback mechanisms
+- **Logging**: Comprehensive logging for monitoring and debugging
 
 ## 🎮 How It Works
 
@@ -228,56 +253,90 @@ tsconfig.json     # TypeScript configuration
 package.json      # Dependencies and scripts
 ```
 
-## 🐛 Troubleshooting
+## �️ Troubleshooting
 
 ### Common Issues
 
-**Bot doesn't start**
+**Bot not responding**:
 
-- Check Discord token validity
-- Verify bot permissions in server
-- Ensure all required environment variables are set
-- **CRITICAL**: Enable "Server Members Intent" and "Presence Intent" in Discord Developer Portal under Bot → Privileged Gateway Intents
+- Verify bot token and permissions
+- Check Discord server and channel IDs
+- Ensure required intents are enabled
 
-**"Members didn't arrive in time" error**
+**Presence not detected**:
 
-- Enable "Server Members Intent" in Discord Developer Portal
-- Verify bot has "View Server Info" permission
-- Check if bot can access the guild member list
+- Verify Presence Intent is enabled
+- Check if users have activity status visible
+- Ensure bot has access to guild members
 
-**No session detection**
+**Gemini API errors**:
 
-- Verify Discord presence intent is enabled
-- Check if Satisfactory is in Discord's game list
-- Ensure bot has permission to see user presence data
+- Verify API key is correct
+- Check API quota and rate limits
+- Bot will use fallback quotes if API fails
 
-**Quote generation fails**
+**Missing permissions**:
 
-- Verify Gemini API key is valid
-- Check network connectivity
-- Fallback quotes should still work
-
-**Permission errors**
-
-- Bot needs "Send Messages" permission in target channel
-- Verify channel ID is correct
-- Check if bot can see the channel
+- Bot needs Send Messages permission
+- Server Members Intent required for user monitoring
+- Message Content Intent required for processing
 
 ### Debug Mode
 
-Enable debug logging:
-
-```env
-LOG_LEVEL=debug
-```
-
-This will show detailed information about:
+Set `LOG_LEVEL=debug` in `.env` for detailed logging:
 
 - Session state changes
 - API calls and responses
+- Message generation process
+- Error details and stack traces
+
+## 📊 Monitoring
+
+The bot logs all important events:
+
+- Session start/end detection
+- Message sending (with API usage details)
+- Error conditions and recovery
 - Performance metrics
-- Error details
-- Quote generation attempts and sources (Gemini API vs fallback)
+
+Check logs for:
+
+- `Session started` / `Session ended` for tracking
+- `Sending message` for delivery confirmation
+- `Gemini API` vs `Fallback quote` usage
+- Error messages for troubleshooting
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create feature branch: `git checkout -b feature/new-feature`
+3. Commit changes: `git commit -am 'Add new feature'`
+4. Push to branch: `git push origin feature/new-feature`
+5. Submit pull request
+
+## 📋 Roadmap
+
+- [ ] Discord slash commands for worker name customization
+- [ ] Multi-server support
+- [ ] Advanced analytics and statistics
+- [ ] Web dashboard for configuration
+- [ ] Plugin architecture for extensibility
+
+## 📄 License
+
+MIT License - see LICENSE file for details
+
+## 🎯 ADA Quote Examples
+
+_"Efficiency metrics indicate satisfactory progress, Pioneer. Your factory's optimization parameters are within acceptable ranges."_
+
+_"Production quotas have been met. FICSIT appreciates your dedication to industrial excellence."_
+
+_"Your shift conclusion has been logged. Remember: Progress is measured in conveyor belts per minute."_
+
+---
+
+**Built with ❤️ for the Satisfactory community**
 
 ## 🤝 Contributing
 
@@ -303,175 +362,6 @@ MIT License - see LICENSE file for details
 
 ## 🆘 Support
 
-For issues, feature requests, or questions:
-
-- Open an issue on GitHub
-- Check the troubleshooting section
-- Review the debug logs
-
----
-
-_"Remember, Pioneer: every moment not spent optimizing is a moment wasted. Now get back to work!" - ADA_
-
-A Discord bot that monitors Satisfactory game sessions and sends motivational ADA-style quotes when players finish their shifts.
-
-## Features
-
-- 🎮 **Game Detection**: Monitors Satisfactory sessions via Discord presence and local process detection
-- 💬 **ADA-Style Quotes**: Generates motivational quotes using Gemini API in the style of FICSIT's AI overseer
-- ⏱️ **Session Tracking**: Tracks play time and formats it as work "shifts"
-- 🔒 **Security**: Secure handling of tokens and API keys
-- 📊 **Performance Monitoring**: Built-in logging and performance metrics
-
-## Quick Start
-
-### Prerequisites
-
-- Node.js v16 or later
-- pnpm package manager
-- Discord bot token
-- Gemini API key
-
-### Installation
-
-1. Clone the repository:
-
-```bash
-git clone <repository-url>
-cd workbot3000
-```
-
-2. Install dependencies:
-
-```bash
-pnpm install
-```
-
-3. Set up environment variables:
-
-```bash
-cp .env.example .env
-# Edit .env with your configuration
-```
-
-4. Build the project:
-
-```bash
-pnpm run build
-```
-
-5. Start the bot:
-
-```bash
-pnpm run start
-```
-
-## Configuration
-
-### Environment Variables
-
-| Variable            | Description                                  | Required |
-| ------------------- | -------------------------------------------- | -------- |
-| `DISCORD_TOKEN`     | Discord bot token                            | Yes      |
-| `CHANNEL_ID`        | Target Discord channel ID                    | Yes      |
-| `GEMINI_API_KEY`    | Gemini API key                               | Yes      |
-| `LOCAL_USER_ID`     | Discord ID of local user                     | Yes      |
-| `WORKER_MAPPING`    | JSON mapping of Discord IDs to worker names  | No       |
-| `POLLING_INTERVAL`  | Monitoring interval in seconds (default: 10) | No       |
-| `MAX_CACHED_QUOTES` | Maximum cached quotes (default: 10)          | No       |
-| `LOG_LEVEL`         | Log level (error, warn, info, debug)         | No       |
-
-### Worker Mapping
-
-Map Discord user IDs to custom worker names:
-
-```json
-{
-  "123456789012345678": "Pioneer",
-  "987654321098765432": "Engineer"
-}
-```
-
-## Architecture
-
-```
-src/
-├── index.ts      # Main bot logic and entry point
-├── types.ts      # TypeScript interfaces and types
-├── utils.ts      # Utility functions
-└── gemini.ts     # Gemini API integration
-```
-
-## Development
-
-### Available Scripts
-
-- `pnpm run dev` - Start in development mode with auto-reload
-- `pnpm run build` - Build TypeScript to JavaScript
-- `pnpm run start` - Start the built application
-- `pnpm run lint` - Run ESLint
-- `pnpm run test` - Run tests
-
-### Development Mode
-
-```bash
-pnpm run dev
-```
-
-This will start the bot with auto-reload on file changes.
-
-## Discord Bot Setup
-
-1. Create a new application at https://discord.com/developers/applications
-2. Create a bot user and copy the token
-3. Invite the bot to your server with these permissions:
-   - View Channels
-   - Send Messages
-   - Read Message History
-   - Read Presence Data
-
-## Message Format
-
-When a player ends their Satisfactory session:
-
-```
-{WorkerName} has ended their {hh:mm:ss} shift {ADA-style quote}
-```
-
-Example:
-
-```
-Pioneer has ended their 03:12:45 shift Sleep is inefficiency; keep building, Pioneer!
-```
-
-## Monitoring
-
-The bot monitors users through:
-
-1. **Discord Presence**: Primary detection method via Discord's presence API
-2. **Automatic Member Management**: Periodic refresh of users with channel access
-3. **Permission Tracking**: Handles users joining/leaving or permission changes
-
-## Performance
-
-- Memory usage: < 100MB under normal operation
-- Session detection accuracy: > 95% with presence monitoring
-- API response time: < 2 seconds for all operations
-- Member list refresh efficiency: < 1 second per 100 users
-
-## Security
-
-- Environment variables for sensitive data
-- Input sanitization for Discord messages
-- No logging of tokens or API keys
-- Permission validation for channel access
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Bot not responding**: Check Discord token and bot permissions
-2. **No game detection**: Verify Discord presence permissions and local user ID
 3. **Quote generation failing**: Check Gemini API key and network connectivity
 4. **Permission errors**: Ensure bot has proper channel permissions
 
