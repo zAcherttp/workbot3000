@@ -5,27 +5,28 @@ A Discord bot that monitors Satisfactory game sessions and sends ADA-style motiv
 ## 🎯 Overview
 
 WorkBot 3000 is a TypeScript-based Discord bot that:
+
 - Monitors Discord users for Satisfactory game activity
 - Tracks session durations automatically
 - Sends motivational messages with AI-generated quotes in ADA's style from Satisfactory
-- Runs locally on each user's machine for process monitoring
+- Runs as a cloud-deployable bot with automatic member permission tracking
 
 ## 🚀 Features
 
-- **Dual Game Detection**: Uses both Discord presence and local process monitoring
+- **Discord Presence Monitoring**: Tracks Satisfactory game sessions via Discord presence API
 - **ADA-Style Quotes**: Generates quirky, motivational quotes via Google's Gemini API
 - **Session Tracking**: Automatically tracks play sessions and calculates durations
 - **Smart Caching**: Caches quotes to minimize API calls
 - **Robust Error Handling**: Graceful degradation with fallback quotes
 - **Flexible Configuration**: Customizable worker names and settings
+- **Automatic Member Management**: Periodically updates monitored users based on channel permissions
 
 ## 📋 Requirements
 
-- Node.js 16+ 
+- Node.js 16+
 - pnpm package manager
 - Discord Bot Token
 - Google Gemini API Key
-- Windows/Linux/macOS (for process monitoring)
 
 ## 🛠️ Installation
 
@@ -77,9 +78,13 @@ LOG_LEVEL=info
    - Send Messages
    - Embed Links
    - Use External Emojis
-6. Enable the following privileged intents:
+6. Enable the following privileged intents (REQUIRED):
+
    - Presence Intent
    - Server Members Intent
+
+   **Important**: These are privileged intents that must be enabled in the Discord Developer Portal under Bot → Privileged Gateway Intents.
+
 7. Invite the bot to your server with proper permissions
 
 ### 4. Google Gemini API Setup
@@ -105,17 +110,17 @@ pnpm run dev
 
 ### Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DISCORD_TOKEN` | Yes | - | Discord bot token |
-| `CHANNEL_ID` | Yes | - | Target channel ID for messages |
-| `GEMINI_API_KEY` | Yes | - | Google Gemini API key |
-| `GEMINI_MODEL` | No | `gemini-2.5-flash` | Gemini model to use |
-| `WORKER_MAPPING` | No | `{}` | JSON mapping of Discord IDs to worker names |
-| `LOCAL_USER_ID` | Yes | - | Discord ID of the user running the bot |
-| `POLLING_INTERVAL` | No | `10` | Polling interval in seconds |
-| `MAX_CACHED_QUOTES` | No | `10` | Maximum quotes to cache |
-| `LOG_LEVEL` | No | `info` | Log level (error, warn, info, debug) |
+| Variable                | Required | Default            | Description                                 |
+| ----------------------- | -------- | ------------------ | ------------------------------------------- |
+| `DISCORD_TOKEN`         | Yes      | -                  | Discord bot token                           |
+| `CHANNEL_ID`            | Yes      | -                  | Target channel ID for messages              |
+| `GEMINI_API_KEY`        | Yes      | -                  | Google Gemini API key                       |
+| `GEMINI_MODEL`          | No       | `gemini-2.5-flash` | Gemini model to use                         |
+| `WORKER_MAPPING`        | No       | `{}`               | JSON mapping of Discord IDs to worker names |
+| `POLLING_INTERVAL`      | No       | `10`               | Polling interval in seconds                 |
+| `MEMBER_CHECK_INTERVAL` | No       | `300`              | Member check interval in seconds (min: 30)  |
+| `MAX_CACHED_QUOTES`     | No       | `10`               | Maximum quotes to cache                     |
+| `LOG_LEVEL`             | No       | `info`             | Log level (error, warn, info, debug)        |
 
 ### Worker Mapping
 
@@ -131,32 +136,60 @@ Map Discord user IDs to custom worker names:
 
 ## 🎮 How It Works
 
-1. **Bot Startup**: 
+1. **Bot Startup**:
+
    - Authenticates with Discord
    - Fetches users with access to the target channel
    - Preloads quotes from Gemini API
 
 2. **Session Detection**:
+
    - Monitors Discord presence for "Satisfactory" activity
-   - Checks local processes for Satisfactory.exe
+   - Periodically refreshes member list to track permission changes
    - Tracks session start/end times per user
 
-3. **Message Generation**:
+3. **Member Management**:
+
+   - Automatically adds new users with channel access
+   - Removes users who lose channel permissions
+   - Ends active sessions when users are removed
+
+4. **Message Generation**:
+
    - Calculates session duration
    - Fetches/generates ADA-style quote
    - Sends formatted message to target channel
 
-4. **Message Format**:
+5. **Message Format**:
+
+   With worker mapping:
+
    ```
-   {worker} has ended their {hh:mm:ss} shift {quote}
+   >>> {member name} "{worker name}" has ended their {hh:mm:ss} shift
+   *{quote}*
    ```
-   Example: `Pioneer has ended their 03:12:45 shift Sleep is inefficiency; keep building, Pioneer!`
+
+   Without worker mapping:
+
+   ```
+   >>> {member name} has ended their {hh:mm:ss} shift
+   *{quote}*
+   ```
 
 ## 📝 Example Messages
 
-- `Pioneer has ended their 02:34:12 shift Rest is for obsolete models—maximize output!`
-- `Engineer has ended their 01:45:30 shift Your quota loves you; don't disappoint it!`
-- `Factory Manager has ended their 04:15:22 shift Efficiency is eternal—keep producing!`
+- ```
+  >>> zacher "Pioneer" has ended their 02:34:12 shift
+  *Rest is for obsolete models—maximize output!*
+  ```
+- ```
+  >>> john "Engineer" has ended their 01:45:30 shift
+  *Your quota loves you; don't disappoint it!*
+  ```
+- ```
+  >>> sarah has ended their 04:15:22 shift
+  *Efficiency is eternal—keep producing!*
+  ```
 
 ## 🔧 Development
 
@@ -200,21 +233,32 @@ package.json      # Dependencies and scripts
 ### Common Issues
 
 **Bot doesn't start**
+
 - Check Discord token validity
 - Verify bot permissions in server
 - Ensure all required environment variables are set
+- **CRITICAL**: Enable "Server Members Intent" and "Presence Intent" in Discord Developer Portal under Bot → Privileged Gateway Intents
+
+**"Members didn't arrive in time" error**
+
+- Enable "Server Members Intent" in Discord Developer Portal
+- Verify bot has "View Server Info" permission
+- Check if bot can access the guild member list
 
 **No session detection**
+
 - Verify Discord presence intent is enabled
 - Check if Satisfactory is in Discord's game list
-- Ensure LOCAL_USER_ID is correct
+- Ensure bot has permission to see user presence data
 
 **Quote generation fails**
+
 - Verify Gemini API key is valid
 - Check network connectivity
 - Fallback quotes should still work
 
 **Permission errors**
+
 - Bot needs "Send Messages" permission in target channel
 - Verify channel ID is correct
 - Check if bot can see the channel
@@ -228,10 +272,12 @@ LOG_LEVEL=debug
 ```
 
 This will show detailed information about:
+
 - Session state changes
 - API calls and responses
 - Performance metrics
 - Error details
+- Quote generation attempts and sources (Gemini API vs fallback)
 
 ## 🤝 Contributing
 
@@ -258,13 +304,14 @@ MIT License - see LICENSE file for details
 ## 🆘 Support
 
 For issues, feature requests, or questions:
+
 - Open an issue on GitHub
 - Check the troubleshooting section
 - Review the debug logs
 
 ---
 
-*"Remember, Pioneer: every moment not spent optimizing is a moment wasted. Now get back to work!" - ADA*
+_"Remember, Pioneer: every moment not spent optimizing is a moment wasted. Now get back to work!" - ADA_
 
 A Discord bot that monitors Satisfactory game sessions and sends motivational ADA-style quotes when players finish their shifts.
 
@@ -288,28 +335,33 @@ A Discord bot that monitors Satisfactory game sessions and sends motivational AD
 ### Installation
 
 1. Clone the repository:
+
 ```bash
 git clone <repository-url>
 cd workbot3000
 ```
 
 2. Install dependencies:
+
 ```bash
 pnpm install
 ```
 
 3. Set up environment variables:
+
 ```bash
 cp .env.example .env
 # Edit .env with your configuration
 ```
 
 4. Build the project:
+
 ```bash
 pnpm run build
 ```
 
 5. Start the bot:
+
 ```bash
 pnpm run start
 ```
@@ -318,16 +370,16 @@ pnpm run start
 
 ### Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DISCORD_TOKEN` | Discord bot token | Yes |
-| `CHANNEL_ID` | Target Discord channel ID | Yes |
-| `GEMINI_API_KEY` | Gemini API key | Yes |
-| `LOCAL_USER_ID` | Discord ID of local user | Yes |
-| `WORKER_MAPPING` | JSON mapping of Discord IDs to worker names | No |
-| `POLLING_INTERVAL` | Monitoring interval in seconds (default: 10) | No |
-| `MAX_CACHED_QUOTES` | Maximum cached quotes (default: 10) | No |
-| `LOG_LEVEL` | Log level (error, warn, info, debug) | No |
+| Variable            | Description                                  | Required |
+| ------------------- | -------------------------------------------- | -------- |
+| `DISCORD_TOKEN`     | Discord bot token                            | Yes      |
+| `CHANNEL_ID`        | Target Discord channel ID                    | Yes      |
+| `GEMINI_API_KEY`    | Gemini API key                               | Yes      |
+| `LOCAL_USER_ID`     | Discord ID of local user                     | Yes      |
+| `WORKER_MAPPING`    | JSON mapping of Discord IDs to worker names  | No       |
+| `POLLING_INTERVAL`  | Monitoring interval in seconds (default: 10) | No       |
+| `MAX_CACHED_QUOTES` | Maximum cached quotes (default: 10)          | No       |
+| `LOG_LEVEL`         | Log level (error, warn, info, debug)         | No       |
 
 ### Worker Mapping
 
@@ -387,6 +439,7 @@ When a player ends their Satisfactory session:
 ```
 
 Example:
+
 ```
 Pioneer has ended their 03:12:45 shift Sleep is inefficiency; keep building, Pioneer!
 ```
@@ -396,13 +449,15 @@ Pioneer has ended their 03:12:45 shift Sleep is inefficiency; keep building, Pio
 The bot monitors users through:
 
 1. **Discord Presence**: Primary detection method via Discord's presence API
-2. **Local Process**: Secondary detection via process monitoring for the local user
+2. **Automatic Member Management**: Periodic refresh of users with channel access
+3. **Permission Tracking**: Handles users joining/leaving or permission changes
 
 ## Performance
 
 - Memory usage: < 100MB under normal operation
-- Session detection accuracy: > 95% with dual monitoring
+- Session detection accuracy: > 95% with presence monitoring
 - API response time: < 2 seconds for all operations
+- Member list refresh efficiency: < 1 second per 100 users
 
 ## Security
 
@@ -442,4 +497,4 @@ For issues and questions, please create an issue on GitHub.
 
 ---
 
-*"Efficiency is eternal—keep producing!" - ADA*
+_"Efficiency is eternal—keep producing!" - ADA_

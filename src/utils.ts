@@ -1,19 +1,10 @@
-import * as ps from "ps-node";
 import {
   LogLevel,
   LogEntry,
   RetryConfig,
-  ProcessCheckResult,
   WorkerConfig,
   BotConfig,
 } from "./types.js";
-
-// Type definitions for ps-node since @types/ps-node doesn't exist
-interface PsProcess {
-  pid: number;
-  command: string;
-  arguments: string[];
-}
 
 //type PsCallback = (err: Error | null, resultList: PsProcess[]) => void;
 
@@ -31,55 +22,6 @@ export function formatDuration(milliseconds: number): string {
   return `${hours.toString().padStart(2, "0")}:${minutes
     .toString()
     .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
-}
-
-/**
- * Check if Satisfactory process is running using ps-node
- * @returns Promise resolving to process check result
- */
-export async function checkSatisfactoryProcess(): Promise<ProcessCheckResult> {
-  const timestamp = Date.now();
-
-  return new Promise((resolve) => {
-    ps.lookup(
-      {
-        command: "Satisfactory",
-        psargs: "aux",
-      },
-      (err: Error | null, resultList: PsProcess[]) => {
-        if (err) {
-          resolve({
-            isRunning: false,
-            error: err.message,
-            timestamp,
-          });
-          return;
-        }
-
-        // Filter for actual Satisfactory executable
-        const satisfactoryProcesses = resultList.filter(
-          (process: PsProcess) =>
-            process.command &&
-            (process.command.includes("Satisfactory.exe") ||
-              process.command.includes("FactoryGame.exe") ||
-              process.command.toLowerCase().includes("satisfactory"))
-        );
-
-        if (satisfactoryProcesses.length > 0) {
-          resolve({
-            isRunning: true,
-            pid: satisfactoryProcesses[0]?.pid || 0,
-            timestamp,
-          });
-        } else {
-          resolve({
-            isRunning: false,
-            timestamp,
-          });
-        }
-      }
-    );
-  });
 }
 
 /**
@@ -129,12 +71,9 @@ export function parseWorkerMapping(
  * @returns Sanitized message content
  */
 export function sanitizeDiscordMessage(content: string): string {
-  // Escape Discord markdown characters
-  const discordMarkdown = /([*_`~|\\])/g;
-
-  // Replace potentially harmful characters
+  // Don't escape asterisks used for italics in our quote formatting
+  // Only escape potentially harmful characters
   return content
-    .replace(discordMarkdown, "\\$1")
     .replace(/@(everyone|here)/g, "@​$1") // Zero-width space to prevent pings
     .replace(/<@[!&]?(\d+)>/g, "@​user") // Remove user mentions
     .replace(/<#(\d+)>/g, "#​channel") // Remove channel mentions
@@ -222,12 +161,7 @@ export async function withRetry<T>(
  * @returns Parsed bot configuration
  */
 export function parseBotConfig(): BotConfig {
-  const requiredEnvVars = [
-    "DISCORD_TOKEN",
-    "CHANNEL_ID",
-    "GEMINI_API_KEY",
-    "LOCAL_USER_ID",
-  ];
+  const requiredEnvVars = ["DISCORD_TOKEN", "CHANNEL_ID", "GEMINI_API_KEY"];
 
   // Check for required environment variables
   for (const varName of requiredEnvVars) {
@@ -251,6 +185,13 @@ export function parseBotConfig(): BotConfig {
     throw new Error("MAX_CACHED_QUOTES must be a positive number");
   }
 
+  const memberCheckInterval = parseInt(
+    process.env["MEMBER_CHECK_INTERVAL"] || "300"
+  );
+  if (isNaN(memberCheckInterval) || memberCheckInterval < 30) {
+    throw new Error("MEMBER_CHECK_INTERVAL must be at least 30 seconds");
+  }
+
   // Validate log level
   const logLevel = (process.env["LOG_LEVEL"] || "info") as LogLevel;
   if (!["error", "warn", "info", "debug"].includes(logLevel)) {
@@ -263,10 +204,10 @@ export function parseBotConfig(): BotConfig {
     geminiApiKey: process.env["GEMINI_API_KEY"]!,
     geminiModel: process.env["GEMINI_MODEL"] || "gemini-2.5-flash",
     workerMapping,
-    localUserId: process.env["LOCAL_USER_ID"]!,
     pollingInterval,
     maxCachedQuotes,
     logLevel,
+    memberCheckInterval,
   };
 }
 

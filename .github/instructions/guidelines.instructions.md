@@ -13,8 +13,8 @@ WorkBot 3000 is a Discord bot that monitors Satisfactory game sessions for users
 - **Runtime**: Node.js v16+
 - **Language**: TypeScript (strict mode, ESNext target)
 - **Package Manager**: pnpm
-- **Main Dependencies**: discord.js v14+, ps-node, axios, dotenv
-- **Architecture**: Local bot instances with in-memory state management
+- **Main Dependencies**: discord.js v14+, @google/genai, dotenv
+- **Architecture**: Cloud-deployable bot with Discord presence monitoring
 
 ## Coding Standards
 
@@ -32,7 +32,7 @@ WorkBot 3000 is a Discord bot that monitors Satisfactory game sessions for users
 src/
 ├── index.ts      # Main bot logic and entry point
 ├── types.ts      # Custom interfaces and type definitions
-├── utils.ts      # Utility functions (time formatting, process checks)
+├── utils.ts      # Utility functions (time formatting, Discord helpers)
 └── gemini.ts     # Gemini API integration
 ```
 
@@ -51,6 +51,7 @@ src/
 - Optimize Discord presence subscriptions
 - Limit polling frequency to 10-second intervals
 - Use Map for efficient session state management
+- Periodic member list refresh to handle permission changes
 
 ### Security Practices
 
@@ -64,7 +65,7 @@ src/
 
 ### Discord API
 
-- Use discord.js v14+ with required intents: Guilds, GuildPresences, GuildMessages
+- Use discord.js v14+ with required intents: Guilds, GuildMembers, GuildPresences, GuildMessages
 - Monitor user presence activities for "Satisfactory" game detection
 - Handle permission overwrites and role-based channel visibility
 - Implement proper bot permissions: read messages, send messages, embed links
@@ -72,16 +73,17 @@ src/
 ### Satisfactory Game Detection
 
 - Primary: Discord presence API monitoring
-- Secondary: Local process monitoring (Satisfactory.exe via ps-node)
 - Handle unreliable presence data gracefully
-- Cross-reference both methods for accuracy
+- Periodic member list refresh to track permission changes
+- Monitor all users with channel access automatically
 
 ### Session Management
 
-- Track state per user: `{ startTime: number | null, isPlaying: boolean }`
+- Track state per user: `{ startTime: number | null, isPlaying: boolean, lastPresenceCheck: number }`
 - Use Discord user ID as the primary key
 - Format duration as hh:mm:ss (e.g., "03:12:45")
 - Reset state after sending session end message
+- Automatically handle user permission changes
 
 ### ADA-Style Quotes
 
@@ -93,8 +95,13 @@ src/
 
 ### Message Format
 
-Standard format: `"{worker} has ended their {hh:mm:ss} shift {quote}"`
-Example: `"Pioneer has ended their 03:12:45 shift Efficiency is eternal—keep producing!"`
+Standard format with worker mapping: `">>> {member name} \"{worker name}\" has ended their {hh:mm:ss} shift\n*{quote}*"`
+Standard format without worker mapping: `">>> {member name} has ended their {hh:mm:ss} shift\n*{quote}*"`
+
+Examples:
+
+- `">>> zacher \"Pioneer\" has ended their 03:12:45 shift\n*Efficiency is eternal—keep producing!*"`
+- `">>> john has ended their 02:30:15 shift\n*Sleep is for obsolete models—maximize output!*"`
 
 ## Environment Variables
 
@@ -104,7 +111,7 @@ Required variables in .env:
 - `CHANNEL_ID`: Target Discord channel ID
 - `GEMINI_API_KEY`: Gemini API authentication key
 - `WORKER_MAPPING`: JSON string mapping Discord IDs to worker names
-- `LOCAL_USER_ID`: Discord ID of local user for process monitoring
+- `MEMBER_CHECK_INTERVAL`: Interval for checking member permissions (optional, default: 300 seconds)
 
 ## Best Practices
 
@@ -114,6 +121,8 @@ Required variables in .env:
 - Log session start/stop events
 - Log errors with context but not sensitive data
 - Use consistent log format: `[TIMESTAMP] [LEVEL] message`
+- Log API usage status (Gemini API success vs fallback quotes)
+- Include quote source information for debugging
 
 ### State Management
 
@@ -163,13 +172,14 @@ Required variables in .env:
 
 - Memory usage: < 100MB under normal operation
 - API response time: < 2 seconds for all operations
-- Session detection accuracy: > 95% with dual monitoring
+- Session detection accuracy: > 95% with presence monitoring
 - Uptime: > 99.9% with proper error handling
+- Member list refresh efficiency: < 1 second per 100 users
 
 ## Deployment Considerations
 
-- Local deployment on each user's machine
-- One bot instance per user
-- No cloud hosting or shared infrastructure
+- Can be deployed locally or in the cloud
+- Single bot instance per Discord server
 - Handle network interruptions gracefully
 - Support for multiple Discord servers (future)
+- Automatic member permission tracking

@@ -1,6 +1,6 @@
-import { GoogleGenAI } from '@google/genai';
-import { GeminiQuote, RetryConfig } from './types.js';
-import { withRetry, createLogger } from './utils.js';
+import { GoogleGenAI } from "@google/genai";
+import { GeminiQuote, RetryConfig } from "./types";
+import { withRetry, createLogger } from "./utils";
 
 /**
  * Gemini API client for generating ADA-style motivational quotes
@@ -166,36 +166,36 @@ Generate only the quote text without any additional formatting or explanation.`;
         thinkingConfig: {
           thinkingBudget: 0,
         },
-        responseMimeType: 'text/plain',
+        responseMimeType: "text/plain",
         systemInstruction: [
           {
             text: this.systemInstruction,
-          }
+          },
         ],
       };
 
       const contents = [
         {
-          role: 'user',
+          role: "user",
           parts: [
             {
-              text: 'generate',
+              text: "generate",
             },
           ],
         },
         {
-          role: 'model',
+          role: "model",
           parts: [
             {
-              text: 'Remember, Pioneer: every breath you take not spent optimizing production is a tiny act of corporate sabotage.',
+              text: "Remember, Pioneer: every breath you take not spent optimizing production is a tiny act of corporate sabotage.",
             },
           ],
         },
         {
-          role: 'user',
+          role: "user",
           parts: [
             {
-              text: 'Generate a new motivational quote',
+              text: "Generate a new motivational quote",
             },
           ],
         },
@@ -207,7 +207,7 @@ Generate only the quote text without any additional formatting or explanation.`;
         contents,
       });
 
-      let quoteText = '';
+      let quoteText = "";
       for await (const chunk of response) {
         if (chunk.text) {
           quoteText += chunk.text;
@@ -216,7 +216,7 @@ Generate only the quote text without any additional formatting or explanation.`;
 
       quoteText = quoteText.trim();
       if (!quoteText) {
-        throw new Error('Empty quote text returned from Gemini API');
+        throw new Error("Empty quote text returned from Gemini API");
       }
 
       const quote: GeminiQuote = {

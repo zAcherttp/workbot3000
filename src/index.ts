@@ -19,7 +19,6 @@ import {
   getWorkerName,
   sanitizeDiscordMessage,
   createLogger,
-  checkSatisfactoryProcess,
   getMemoryUsage,
 } from "./utils";
 import { createGeminiClient, GeminiClient } from "./gemini";
@@ -38,6 +37,7 @@ class WorkBot3000 {
   private monitoredUsers: Map<string, DiscordUser> = new Map();
   private targetChannel: TextChannel | null = null;
   private pollingInterval: NodeJS.Timeout | null = null;
+  private memberCheckInterval: NodeJS.Timeout | null = null;
   private isShuttingDown = false;
   private logger: (entry: {
     level: "error" | "warn" | "info" | "debug";
@@ -54,6 +54,7 @@ class WorkBot3000 {
     this.client = new Client({
       intents: [
         GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildPresences,
         GatewayIntentBits.GuildMessages,
       ],
@@ -82,13 +83,29 @@ class WorkBot3000 {
 
       await this.client.login(this.config.discordToken);
     } catch (error) {
-      this.logger({
-        level: "error",
-        message: "Failed to start bot",
-        context: {
-          error: error instanceof Error ? error.message : String(error),
-        },
-      });
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+
+      // Provide specific guidance for common errors
+      if (errorMessage.includes("Used disallowed intents")) {
+        this.logger({
+          level: "error",
+          message: "Bot failed to start due to missing privileged intents",
+          context: {
+            error: errorMessage,
+            solution:
+              "Enable 'Server Members Intent' and 'Presence Intent' in Discord Developer Portal under Bot → Privileged Gateway Intents",
+          },
+        });
+      } else {
+        this.logger({
+          level: "error",
+          message: "Failed to start bot",
+          context: {
+            error: errorMessage,
+          },
+        });
+      }
       process.exit(1);
     }
   }
@@ -109,6 +126,11 @@ class WorkBot3000 {
     // Clear polling interval
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
+    }
+
+    // Clear member check interval
+    if (this.memberCheckInterval) {
+      clearInterval(this.memberCheckInterval);
     }
 
     // Send final messages for active sessions
@@ -162,6 +184,9 @@ class WorkBot3000 {
 
       // Start monitoring
       this.startMonitoring();
+
+      // Start member checking
+      this.startMemberChecking();
 
       this.logger({
         level: "info",
@@ -218,12 +243,18 @@ class WorkBot3000 {
    * Handle presence update events
    */
   private async onPresenceUpdate(
-    _oldPresence: any,
-    newPresence: any
+    _oldPresence: unknown,
+    newPresence: unknown
   ): Promise<void> {
-    if (!newPresence || !newPresence.user) return;
+    if (
+      !newPresence ||
+      typeof newPresence !== "object" ||
+      !("user" in newPresence)
+    )
+      return;
 
-    const userId = newPresence.user.id;
+    const userId = (newPresence as any).user?.id;
+    if (!userId) return;
 
     // Only process monitored users
     if (!this.monitoredUsers.has(userId)) return;
@@ -238,11 +269,12 @@ class WorkBot3000 {
         userId,
         isPlayingSatisfactory,
         activities:
-          newPresence.activities?.map((a: GameActivity) => a.name) || [],
+          (newPresence as any).activities?.map((a: GameActivity) => a.name) ||
+          [],
       },
     });
 
-    await this.updateSessionState(userId, isPlayingSatisfactory, "presence");
+    await this.updateSessionState(userId, isPlayingSatisfactory);
   }
 
   /**
@@ -275,42 +307,149 @@ class WorkBot3000 {
    * Fetch users who have access to the target channel
    */
   private async fetchMonitoredUsers(): Promise<void> {
-    if (!this.targetChannel) return;
+    // Use the same logic as updateMonitoredUsers for initial load
+    await this.updateMonitoredUsers();
+  }
 
-    const guild = this.targetChannel.guild;
+  /**
+   * Start the member checking interval
+   */
+  private startMemberChecking(): void {
+    this.memberCheckInterval = setInterval(async () => {
+      if (this.isShuttingDown) return;
 
-    // Fetch all members
-    await guild.members.fetch();
-
-    // Check each member's permissions
-    for (const [userId, member] of guild.members.cache) {
-      if (member.user.bot) continue; // Skip bots
-
-      const hasAccess = this.userHasChannelAccess(member, this.targetChannel);
-
-      if (hasAccess) {
-        this.monitoredUsers.set(userId, {
-          user: member.user,
-          member,
-          hasChannelAccess: true,
-          lastPresence: member.presence?.status || null,
-        });
-
-        // Initialize session state
-        this.sessionStates.set(userId, {
-          startTime: null,
-          isPlaying: false,
-          lastPresenceCheck: Date.now(),
-          lastProcessCheck: Date.now(),
-        });
-      }
-    }
+      await this.updateMonitoredUsers();
+    }, this.config.memberCheckInterval * 1000);
 
     this.logger({
       level: "info",
-      message: "Monitored users fetched",
-      context: { count: this.monitoredUsers.size },
+      message: "Member checking started",
+      context: { intervalSeconds: this.config.memberCheckInterval },
     });
+  }
+
+  /**
+   * Update monitored users list (periodic refresh)
+   */
+  private async updateMonitoredUsers(): Promise<void> {
+    if (!this.targetChannel) return;
+
+    try {
+      const guild = this.targetChannel.guild;
+
+      this.logger({
+        level: "debug",
+        message: "Fetching guild members",
+        context: { guildId: guild.id, guildName: guild.name },
+      });
+
+      // Fetch all members with timeout
+      try {
+        await guild.members.fetch({ time: 30000 }); // 30 second timeout
+      } catch (fetchError) {
+        this.logger({
+          level: "error",
+          message: "Failed to fetch guild members - check bot permissions",
+          context: {
+            error:
+              fetchError instanceof Error
+                ? fetchError.message
+                : String(fetchError),
+            guildId: guild.id,
+            hasGuildMembersIntent:
+              "Ensure 'Server Members Intent' is enabled in Discord Developer Portal",
+          },
+        });
+        return;
+      }
+
+      const currentUserIds = new Set(this.monitoredUsers.keys());
+      const newUserIds = new Set<string>();
+
+      // Check each member's permissions
+      for (const [userId, member] of guild.members.cache) {
+        if (member.user.bot) continue; // Skip bots
+
+        const hasAccess = this.userHasChannelAccess(member, this.targetChannel);
+
+        if (hasAccess) {
+          newUserIds.add(userId);
+
+          // Add new user or update existing
+          if (!this.monitoredUsers.has(userId)) {
+            this.monitoredUsers.set(userId, {
+              user: member.user,
+              member,
+              hasChannelAccess: true,
+              lastPresence: member.presence?.status || null,
+            });
+
+            // Initialize session state for new user
+            this.sessionStates.set(userId, {
+              startTime: null,
+              isPlaying: false,
+              lastPresenceCheck: Date.now(),
+            });
+
+            this.logger({
+              level: "info",
+              message: "New user added to monitoring",
+              context: { userId, username: member.user.username },
+            });
+          } else {
+            // Update existing user info
+            const existingUser = this.monitoredUsers.get(userId)!;
+            existingUser.member = member;
+            existingUser.hasChannelAccess = true;
+            existingUser.lastPresence = member.presence?.status || null;
+          }
+        }
+      }
+
+      // Remove users who no longer have access
+      for (const userId of currentUserIds) {
+        if (!newUserIds.has(userId)) {
+          // End any active session before removing
+          const sessionState = this.sessionStates.get(userId);
+          if (sessionState?.isPlaying && sessionState.startTime) {
+            const duration = Date.now() - sessionState.startTime;
+            await this.sendSessionEndMessage(userId, duration);
+          }
+
+          this.monitoredUsers.delete(userId);
+          this.sessionStates.delete(userId);
+
+          this.logger({
+            level: "info",
+            message: "User removed from monitoring",
+            context: { userId },
+          });
+        }
+      }
+
+      const addedUsers = newUserIds.size - currentUserIds.size;
+      const removedUsers = currentUserIds.size - newUserIds.size;
+
+      if (addedUsers > 0 || removedUsers > 0) {
+        this.logger({
+          level: "info",
+          message: "Monitored users updated",
+          context: {
+            totalUsers: this.monitoredUsers.size,
+            addedUsers,
+            removedUsers,
+          },
+        });
+      }
+    } catch (error) {
+      this.logger({
+        level: "error",
+        message: "Failed to update monitored users",
+        context: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
   }
 
   /**
@@ -339,10 +478,21 @@ class WorkBot3000 {
   /**
    * Check if user is playing Satisfactory from presence data
    */
-  private isPlayingSatisfactoryFromPresence(presence: any): boolean {
-    if (!presence || !presence.activities) return false;
+  private isPlayingSatisfactoryFromPresence(presence: unknown): boolean {
+    if (
+      !presence ||
+      typeof presence !== "object" ||
+      !("activities" in presence)
+    ) {
+      return false;
+    }
 
-    return presence.activities.some(
+    const activities = (presence as any).activities;
+    if (!Array.isArray(activities)) {
+      return false;
+    }
+
+    return activities.some(
       (activity: GameActivity) =>
         activity.type === ActivityType.Playing &&
         activity.name === "Satisfactory"
@@ -350,7 +500,7 @@ class WorkBot3000 {
   }
 
   /**
-   * Start the monitoring loop
+   * Start the monitoring loop (presence-only)
    */
   private startMonitoring(): void {
     this.pollingInterval = setInterval(async () => {
@@ -361,39 +511,23 @@ class WorkBot3000 {
 
     this.logger({
       level: "info",
-      message: "Monitoring started",
+      message: "Presence monitoring started",
       context: { intervalSeconds: this.config.pollingInterval },
     });
   }
 
   /**
-   * Perform one monitoring cycle
+   * Perform one monitoring cycle (presence-only)
    */
   private async performMonitoringCycle(): Promise<void> {
     try {
-      // Check local process
-      const processResult = await checkSatisfactoryProcess();
-      const localUserPlaying = processResult.isRunning;
-
-      // Update local user session if configured
-      if (
-        this.config.localUserId &&
-        this.monitoredUsers.has(this.config.localUserId)
-      ) {
-        await this.updateSessionState(
-          this.config.localUserId,
-          localUserPlaying,
-          "process"
-        );
-      }
-
       // Check presence for all monitored users
       for (const [userId, discordUser] of this.monitoredUsers) {
         if (discordUser.member?.presence) {
           const isPlaying = this.isPlayingSatisfactoryFromPresence(
             discordUser.member.presence
           );
-          await this.updateSessionState(userId, isPlaying, "presence");
+          await this.updateSessionState(userId, isPlaying);
         }
       }
 
@@ -414,24 +548,19 @@ class WorkBot3000 {
   }
 
   /**
-   * Update session state for a user
+   * Update session state for a user (presence-only)
    */
   private async updateSessionState(
     userId: string,
-    isPlaying: boolean,
-    source: "presence" | "process"
+    isPlaying: boolean
   ): Promise<void> {
     const currentState = this.sessionStates.get(userId);
     if (!currentState) return;
 
     const now = Date.now();
 
-    // Update check timestamps
-    if (source === "presence") {
-      currentState.lastPresenceCheck = now;
-    } else {
-      currentState.lastProcessCheck = now;
-    }
+    // Update check timestamp
+    currentState.lastPresenceCheck = now;
 
     // Handle session start
     if (isPlaying && !currentState.isPlaying) {
@@ -441,21 +570,20 @@ class WorkBot3000 {
       this.logger({
         level: "info",
         message: "Session started",
-        context: { userId, source },
+        context: { userId, source: "presence" },
       });
     }
 
     // Handle session end
     if (!isPlaying && currentState.isPlaying && currentState.startTime) {
       const duration = now - currentState.startTime;
-      const sessionStartTime = currentState.startTime;
 
       // Reset state first
       currentState.isPlaying = false;
       currentState.startTime = null;
 
       // Send session end message
-      await this.sendSessionEndMessage(userId, duration, sessionStartTime);
+      await this.sendSessionEndMessage(userId, duration);
 
       this.logger({
         level: "info",
@@ -474,28 +602,71 @@ class WorkBot3000 {
    */
   private async sendSessionEndMessage(
     userId: string,
-    duration: number,
-    _startTime: number
+    duration: number
   ): Promise<void> {
     if (!this.targetChannel) return;
 
     try {
+      const discordUser = this.monitoredUsers.get(userId);
+      const memberName = discordUser?.user.username || "Unknown User";
       const workerName = getWorkerName(userId, this.config.workerMapping);
       const formattedDuration = formatDuration(duration);
+
+      // Attempt to get quote and log the result
+      this.logger({
+        level: "debug",
+        message: "Attempting to fetch quote for session end message",
+        context: { userId, memberName },
+      });
+
       const quote = await this.geminiClient.getQuote();
 
-      const message = `${workerName} has ended their ${formattedDuration} shift ${quote.text}`;
-      const sanitizedMessage = sanitizeDiscordMessage(message);
+      this.logger({
+        level: "debug",
+        message: `Quote retrieval ${
+          quote.isFallback ? "failed - using fallback" : "successful"
+        }`,
+        context: {
+          userId,
+          quoteSource: quote.isFallback ? "fallback/cache" : "gemini-api",
+          quoteLength: quote.text.length,
+        },
+      });
 
+      // Check if worker mapping is available (not using default name)
+      const hasCustomWorkerName =
+        this.config.workerMapping.mapping[userId] !== undefined;
+
+      let message: string;
+      if (hasCustomWorkerName) {
+        // Format: >>> {member name} "{worker name}" has ended their {duration} shift
+        // {italic quote}
+        message = `>>> ${memberName} "${workerName}" has ended their ${formattedDuration} shift!\n*${quote.text}*`;
+      } else {
+        // Format: >>> {member name} has ended their {duration} shift
+        // {italic quote}
+        message = `>>> ${memberName} has ended their ${formattedDuration} shift!\n*${quote.text}*`;
+      }
+
+      const sanitizedMessage = sanitizeDiscordMessage(message);
       await this.targetChannel.send(sanitizedMessage);
+
+      // Log with explicit API usage information
+      const apiUsageMessage = quote.isFallback
+        ? "used fallback/cached quote (Gemini API unavailable)"
+        : "successfully used Gemini API for fresh quote";
 
       this.logger({
         level: "info",
-        message: "Session end message sent",
+        message: `Session end message sent - ${apiUsageMessage}`,
         context: {
           userId,
+          memberName,
           workerName,
           duration: formattedDuration,
+          hasCustomWorkerName,
+          quoteSource: quote.isFallback ? "fallback/cache" : "gemini-api",
+          quoteTimestamp: quote.timestamp,
           isFallbackQuote: quote.isFallback,
         },
       });
@@ -516,7 +687,7 @@ class WorkBot3000 {
    */
   private async handleShutdownSessions(): Promise<void> {
     const activeSessions = Array.from(this.sessionStates.entries()).filter(
-      ([_, state]) => state.isPlaying && state.startTime
+      ([, state]) => state.isPlaying && state.startTime
     );
 
     if (activeSessions.length === 0) return;
@@ -530,7 +701,7 @@ class WorkBot3000 {
     for (const [userId, state] of activeSessions) {
       if (state.startTime) {
         const duration = Date.now() - state.startTime;
-        await this.sendSessionEndMessage(userId, duration, state.startTime);
+        await this.sendSessionEndMessage(userId, duration);
       }
     }
   }

@@ -10,8 +10,6 @@ export interface SessionState {
   isPlaying: boolean;
   /** Last known presence status for debugging */
   lastPresenceCheck: number;
-  /** Last known process check result for debugging */
-  lastProcessCheck: number;
 }
 
 /**
@@ -60,32 +58,18 @@ export interface BotConfig {
   channelId: string;
   /** Gemini API key */
   geminiApiKey: string;
-  /** Gemini API URL */
+  /** Gemini model name */
   geminiModel: string;
   /** Worker name mapping configuration */
   workerMapping: WorkerConfig;
-  /** Local user ID for process monitoring */
-  localUserId: string;
   /** Polling interval in seconds */
   pollingInterval: number;
   /** Maximum number of cached quotes */
   maxCachedQuotes: number;
   /** Log level */
   logLevel: LogLevel;
-}
-
-/**
- * Process check result from ps-node
- */
-export interface ProcessCheckResult {
-  /** Whether Satisfactory process is running */
-  isRunning: boolean;
-  /** Process ID if running */
-  pid?: number;
-  /** Error message if check failed */
-  error?: string;
-  /** Timestamp of the check */
-  timestamp: number;
+  /** Member check interval in seconds (default: 300 = 5 minutes) */
+  memberCheckInterval: number;
 }
 
 /**
