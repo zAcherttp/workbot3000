@@ -12,7 +12,7 @@ A TypeScript Discord bot that monitors Satisfactory game sessions and delivers A
 - **Robust Error Handling**: Graceful handling of API failures, Discord outages, and edge cases
 - **Comprehensive Logging**: Detailed logging for monitoring and troubleshooting
 
-## � Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -50,22 +50,6 @@ pnpm start
 ### Environment Variables
 
 ```env
-# Discord Configuration
-DISCORD_BOT_TOKEN=your_discord_bot_token
-DISCORD_GUILD_ID=your_server_id
-DISCORD_CHANNEL_ID=your_channel_id
-
-# Gemini API Configuration
-GEMINI_API_KEY=your_gemini_api_key
-
-# Worker Name Mapping (optional)
-WORKER_MAPPING={"123456789":"Chief Engineer","987654321":"Factory Supervisor"}
-
-# Logging
-LOG_LEVEL=info
-```
-
-```env
 # Discord Bot Configuration
 DISCORD_TOKEN=your_discord_bot_token_here
 CHANNEL_ID=your_target_channel_id_here
@@ -75,13 +59,23 @@ GEMINI_API_KEY=your_gemini_api_key_here
 GEMINI_MODEL=gemini-2.5-flash
 
 # User Configuration
-WORKER_MAPPING={"123456789012345678": "Pioneer", "987654321098765432": "Engineer"}
-LOCAL_USER_ID=your_discord_user_id_here
+# JSON string mapping Discord user IDs to worker names
+# Format: {"123456789012345678": "Pioneer", "987654321098765432": "Engineer"}
+WORKER_MAPPING={}
 
 # Optional Configuration
+# Polling interval in seconds (default: 10)
 POLLING_INTERVAL=10
+
+# Member check interval in seconds (default: 300 = 5 minutes, minimum: 30)
+MEMBER_CHECK_INTERVAL=300
+
+# Maximum number of cached quotes (default: 10)
 MAX_CACHED_QUOTES=10
-LOG_LEVEL=info
+
+# Log level (error, warn, info, debug)
+LOG_LEVEL=debug
+
 ```
 
 ### Discord Bot Setup
@@ -115,13 +109,6 @@ LOG_LEVEL=info
    - Create API key
    - Add to `.env` file
 
-## 🎮 How It Works
-
-1. **Session Detection**: Bot monitors Discord presence for "Satisfactory" game activity
-2. **Session Tracking**: Tracks when users start and stop playing
-3. **Message Generation**: When a session ends, generates an ADA-style motivational quote
-4. **Message Delivery**: Sends formatted message to configured Discord channel
-
 ### Message Format
 
 ```
@@ -134,11 +121,22 @@ LOG_LEVEL=info
 ### Scripts
 
 ```bash
-pnpm dev        # Development with hot reload
-pnpm build      # Build TypeScript
-pnpm start      # Start production build
-pnpm lint       # Run ESLint
-pnpm test       # Run tests
+# Development
+pnpm run dev          # Run with hot reload
+pnpm run watch        # Watch for TypeScript changes
+
+# Building
+pnpm run build        # Compile TypeScript
+pnpm run clean        # Clean build directory
+
+# Quality
+pnpm run lint         # Run ESLint
+pnpm run lint:fix     # Fix linting issues
+pnpm run type-check   # Type checking only
+
+# Testing
+pnpm run test         # Run tests
+pnpm run test:watch   # Watch mode testing
 ```
 
 ### Project Structure
@@ -149,15 +147,10 @@ src/
 ├── types.ts      # TypeScript interfaces
 ├── utils.ts      # Utility functions
 └── gemini.ts     # Gemini API integration
+.env.example      # Environment variables template
+tsconfig.json     # TypeScript configuration
+package.json      # Dependencies and scripts
 ```
-
-### Key Components
-
-- **Session Management**: Tracks user game sessions using Discord presence
-- **Quote Generation**: Integrates with Gemini API for ADA-style quotes
-- **Message Formatting**: Formats messages with user/worker names and quotes
-- **Error Handling**: Robust error handling with fallback mechanisms
-- **Logging**: Comprehensive logging for monitoring and debugging
 
 ## 🎮 How It Works
 
@@ -216,44 +209,7 @@ src/
   *Efficiency is eternal—keep producing!*
   ```
 
-## 🔧 Development
-
-### Scripts
-
-```bash
-# Development
-pnpm run dev          # Run with hot reload
-pnpm run watch        # Watch for TypeScript changes
-
-# Building
-pnpm run build        # Compile TypeScript
-pnpm run clean        # Clean build directory
-
-# Quality
-pnpm run lint         # Run ESLint
-pnpm run lint:fix     # Fix linting issues
-pnpm run type-check   # Type checking only
-
-# Testing
-pnpm run test         # Run tests
-pnpm run test:watch   # Watch mode testing
-```
-
-### Project Structure
-
-```
-src/
-├── index.ts      # Main bot logic and entry point
-├── types.ts      # TypeScript interfaces and types
-├── utils.ts      # Utility functions
-└── gemini.ts     # Gemini API integration
-
-.env.example      # Environment variables template
-tsconfig.json     # TypeScript configuration
-package.json      # Dependencies and scripts
-```
-
-## �️ Troubleshooting
+## 🆘 Troubleshooting
 
 ### Common Issues
 
@@ -306,33 +262,9 @@ Check logs for:
 - `Gemini API` vs `Fallback quote` usage
 - Error messages for troubleshooting
 
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create feature branch: `git checkout -b feature/new-feature`
-3. Commit changes: `git commit -am 'Add new feature'`
-4. Push to branch: `git push origin feature/new-feature`
-5. Submit pull request
-
 ## 📋 Roadmap
 
-- [ ] Discord slash commands for worker name customization
-- [ ] Multi-server support
-- [ ] Advanced analytics and statistics
-- [ ] Web dashboard for configuration
-- [ ] Plugin architecture for extensibility
-
-## 📄 License
-
-MIT License - see LICENSE file for details
-
-## 🎯 ADA Quote Examples
-
-_"Efficiency metrics indicate satisfactory progress, Pioneer. Your factory's optimization parameters are within acceptable ranges."_
-
-_"Production quotas have been met. FICSIT appreciates your dedication to industrial excellence."_
-
-_"Your shift conclusion has been logged. Remember: Progress is measured in conveyor belts per minute."_
+- See todo/tasks.md
 
 ---
 
@@ -348,42 +280,7 @@ _"Your shift conclusion has been logged. Remember: Progress is measured in conve
 
 ## 📄 License
 
-MIT License - see LICENSE file for details
-
-## 🎯 Roadmap
-
-- [ ] Multi-game support
-- [ ] Web dashboard
-- [ ] Statistics tracking
-- [ ] Custom quote templates
-- [ ] Team monitoring features
-- [ ] Docker deployment
-- [ ] Cloud hosting support
-
-## 🆘 Support
-
-3. **Quote generation failing**: Check Gemini API key and network connectivity
-4. **Permission errors**: Ensure bot has proper channel permissions
-
-### Debug Mode
-
-Set `LOG_LEVEL=debug` in your `.env` file for detailed logging.
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-MIT License - see LICENSE file for details.
-
-## Support
-
-For issues and questions, please create an issue on GitHub.
+MIT License
 
 ---
 
