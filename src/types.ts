@@ -1,4 +1,4 @@
-import { User, GuildMember, PresenceStatus, ActivityType } from 'discord.js';
+import { User, GuildMember, PresenceStatus, ActivityType } from "discord.js";
 
 /**
  * Session state tracking for each monitored user
@@ -37,19 +37,6 @@ export interface GeminiQuote {
 }
 
 /**
- * Gemini API response structure
- */
-export interface GeminiApiResponse {
-  candidates: Array<{
-    content: {
-      parts: Array<{
-        text: string;
-      }>;
-    };
-  }>;
-}
-
-/**
  * Discord user data for monitoring
  */
 export interface DiscordUser {
@@ -74,7 +61,7 @@ export interface BotConfig {
   /** Gemini API key */
   geminiApiKey: string;
   /** Gemini API URL */
-  geminiApiUrl: string;
+  geminiModel: string;
   /** Worker name mapping configuration */
   workerMapping: WorkerConfig;
   /** Local user ID for process monitoring */
@@ -138,7 +125,7 @@ export interface SessionEndEvent {
 /**
  * Logging levels
  */
-export type LogLevel = 'error' | 'warn' | 'info' | 'debug';
+export type LogLevel = "error" | "warn" | "info" | "debug";
 
 /**
  * Log entry structure

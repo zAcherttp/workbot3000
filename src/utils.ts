@@ -10,12 +10,12 @@ import {
 
 // Type definitions for ps-node since @types/ps-node doesn't exist
 interface PsProcess {
-  pid: string;
+  pid: number;
   command: string;
   arguments: string[];
 }
 
-type PsCallback = (err: Error | null, resultList: PsProcess[]) => void;
+//type PsCallback = (err: Error | null, resultList: PsProcess[]) => void;
 
 /**
  * Format duration from milliseconds to hh:mm:ss
@@ -68,7 +68,7 @@ export async function checkSatisfactoryProcess(): Promise<ProcessCheckResult> {
         if (satisfactoryProcesses.length > 0) {
           resolve({
             isRunning: true,
-            pid: parseInt(satisfactoryProcesses[0]?.pid || "0"),
+            pid: satisfactoryProcesses[0]?.pid || 0,
             timestamp,
           });
         } else {
@@ -261,9 +261,7 @@ export function parseBotConfig(): BotConfig {
     discordToken: process.env["DISCORD_TOKEN"]!,
     channelId: process.env["CHANNEL_ID"]!,
     geminiApiKey: process.env["GEMINI_API_KEY"]!,
-    geminiApiUrl:
-      process.env["GEMINI_API_URL"] ||
-      "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+    geminiModel: process.env["GEMINI_MODEL"] || "gemini-2.5-flash",
     workerMapping,
     localUserId: process.env["LOCAL_USER_ID"]!,
     pollingInterval,
